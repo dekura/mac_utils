@@ -1,0 +1,157 @@
+#!/bin/bash
+
+# pdfutils - PDF utilities tool
+
+set -e
+
+usage() {
+    cat << EOF
+Usage: pdfutils <command> [args]
+
+Commands:
+    crop <input.pdf> <start-end>        Crop PDF pages (inclusive)
+                                         Example: pdfutils crop file.pdf 1-5
+                                         Output: file_1-5.pdf
+
+    extractnotes <input.pdf> [format]   Extract annotations from PDF
+                                         Format: markdown (default), json, txt
+                                         Example: pdfutils extractnotes file.pdf json
+                                         Output: file_annotations.json
+
+EOF
+}
+
+crop_pdf() {
+    if [ "$#" -lt 2 ]; then
+        echo "Error: crop requires input file and page range"
+        echo "Usage: pdfutils crop <input.pdf> <start-end>"
+        exit 1
+    fi
+
+    local input="$1"
+    local range="$2"
+
+    # Check if input file exists
+    if [ ! -f "$input" ]; then
+        echo "Error: File '$input' not found"
+        exit 1
+    fi
+
+    # Extract directory, basename and extension
+    local dir=$(dirname "$input")
+    local basename=$(basename "$input" .pdf)
+    local output="${dir}/${basename}_${range}.pdf"
+
+    # Use pdfjam to extract pages
+    echo "Extracting pages $range from $input..."
+
+    # Run pdfjam and filter out harmless sed warnings on macOS
+    pdfjam "$input" "$range" --outfile "$output" --quiet 2>&1 | grep -v "sed:.*RE error" || true
+
+    # Check if output file was created successfully
+    if [ -f "$output" ]; then
+        echo "Created: $output"
+    else
+        echo "Error: Failed to crop PDF"
+        exit 1
+    fi
+}
+
+extractnotes_pdf() {
+    if [ "$#" -lt 1 ]; then
+        echo "Error: extractnotes requires input file"
+        echo "Usage: pdfutils extractnotes <input.pdf> [format]"
+        echo "Format: markdown (default), json, txt"
+        exit 1
+    fi
+
+    local input="$1"
+    local format="${2:-markdown}"  # Default to markdown if not specified
+
+    # Check if input file exists
+    if [ ! -f "$input" ]; then
+        echo "Error: File '$input' not found"
+        exit 1
+    fi
+
+    # Validate format
+    case "$format" in
+        markdown|json|txt)
+            ;;
+        *)
+            echo "Error: Invalid format '$format'"
+            echo "Valid formats: markdown, json, txt"
+            exit 1
+            ;;
+    esac
+
+    # Extract directory, basename and extension
+    local dir=$(dirname "$input")
+    local basename=$(basename "$input" .pdf)
+
+    # Determine output extension based on format
+    local ext
+    case "$format" in
+        markdown) ext="md" ;;
+        json) ext="json" ;;
+        txt) ext="txt" ;;
+    esac
+
+    local output="${dir}/${basename}_annotations.${ext}"
+
+    # Find Python executable (prefer conda base environment)
+    local python_cmd
+    if [ -x "/opt/homebrew/Caskroom/miniconda/base/bin/python" ]; then
+        python_cmd="/opt/homebrew/Caskroom/miniconda/base/bin/python"
+    else
+        python_cmd="python3"
+    fi
+
+    # Extract annotations
+    echo "Extracting annotations from $input (format: $format)..."
+
+    local script_path="$HOME/bin/pdfutils_scripts/extract_annotations.py"
+    if [ ! -f "$script_path" ]; then
+        echo "Error: Extraction script not found at $script_path"
+        exit 1
+    fi
+
+    if "$python_cmd" "$script_path" "$input" "$format" > "$output" 2>&1; then
+        echo "Created: $output"
+
+        # Show summary
+        if [ "$format" = "json" ]; then
+            local count=$("$python_cmd" -c "import json; print(len(json.load(open('$output'))))")
+            echo "Total annotations: $count"
+        fi
+    else
+        echo "Error: Failed to extract annotations"
+        exit 1
+    fi
+}
+
+# Main
+if [ "$#" -eq 0 ]; then
+    usage
+    exit 1
+fi
+
+command="$1"
+shift
+
+case "$command" in
+    crop)
+        crop_pdf "$@"
+        ;;
+    extractnotes)
+        extractnotes_pdf "$@"
+        ;;
+    -h|--help|help)
+        usage
+        ;;
+    *)
+        echo "Error: Unknown command '$command'"
+        usage
+        exit 1
+        ;;
+esac

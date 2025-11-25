@@ -1,0 +1,22 @@
+#!/bin/zsh
+# mux - tmuxinator wrapper with enhanced commands
+
+if [[ "$1" == "ddl" ]]; then
+  tmuxinator-ls-ddl "${@:2}"
+elif [[ "$1" == "new" ]]; then
+  tmuxinator-new "${@:2}"
+elif [[ "$1" == "archive" ]]; then
+  tmuxinator-archive "${@:2}"
+elif [[ "$1" == "" ]] || [[ "$1" == "-h" ]] || [[ "$1" == "--help" ]]; then
+  echo "mux - tmuxinator wrapper with enhanced commands"
+  echo ""
+  echo "Enhanced commands:"
+  echo "  mux ddl              - List projects sorted by deadline"
+  echo "  mux new <name>       - Create new project from template (DDL: 7 days)"
+  echo "  mux archive <name>   - Archive project to ~/.config/tmuxinator-backups"
+  echo ""
+  echo "Standard commands (run 'mux help' for full list):"
+  tmuxinator help
+else
+  tmuxinator "$@"
+fi

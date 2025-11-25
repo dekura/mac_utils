@@ -1,0 +1,42 @@
+#!/usr/bin/env ruby
+# Archive tmuxinator project to backup directory
+
+if ARGV.empty?
+  puts "Usage: tmuxinator-archive <project_name>"
+  puts "Moves project config to ~/.config/tmuxinator-backups"
+  exit 1
+end
+
+project_name = ARGV[0]
+config_dir = File.expand_path('~/.config/tmuxinator')
+backup_dir = File.expand_path('~/.config/tmuxinator-backups')
+source_file = File.join(config_dir, "#{project_name}.yml")
+target_file = File.join(backup_dir, "#{project_name}.yml")
+
+# Check if project exists
+unless File.exist?(source_file)
+  puts "Error: Project '#{project_name}' not found at #{source_file}"
+  exit 1
+end
+
+# Create backup directory if it doesn't exist
+unless Dir.exist?(backup_dir)
+  Dir.mkdir(backup_dir)
+  puts "Created backup directory: #{backup_dir}"
+end
+
+# Check if backup already exists
+if File.exist?(target_file)
+  # Add timestamp to avoid overwriting
+  timestamp = Time.now.strftime('%Y%m%d_%H%M%S')
+  target_file = File.join(backup_dir, "#{project_name}_#{timestamp}.yml")
+  puts "Backup already exists, using timestamped name"
+end
+
+# Move the file
+require 'fileutils'
+FileUtils.mv(source_file, target_file)
+
+puts "Archived project '#{project_name}'"
+puts "  From: #{source_file}"
+puts "  To:   #{target_file}"

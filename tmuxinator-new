@@ -1,0 +1,45 @@
+#!/usr/bin/env ruby
+# Create new tmuxinator project from template with auto ddl
+
+require 'date'
+
+if ARGV.empty?
+  puts "Usage: tmuxinator-new <project_name>"
+  puts "Creates a new tmuxinator project from template with ddl set to 7 days from now"
+  exit 1
+end
+
+project_name = ARGV[0]
+template_file = File.expand_path('~/.config/tmuxinator/template.yml')
+target_file = File.expand_path("~/.config/tmuxinator/#{project_name}.yml")
+
+unless File.exist?(template_file)
+  puts "Error: Template file not found at #{template_file}"
+  exit 1
+end
+
+if File.exist?(target_file)
+  puts "Error: Project '#{project_name}' already exists at #{target_file}"
+  exit 1
+end
+
+# Calculate ddl (7 days from now)
+ddl = (Date.today + 7).strftime('%Y-%m-%d')
+
+# Read template and replace placeholders
+template_content = File.read(template_file)
+new_content = template_content.gsub('project_name', project_name)
+                               .gsub('"2025-12-31"', "\"#{ddl}\"")
+                               .gsub('~/path/to/project', "~/#{project_name}")
+
+# Write new project file
+File.write(target_file, new_content)
+
+puts "Created new project: #{project_name}"
+puts "  File: #{target_file}"
+puts "  DDL: #{ddl} (7 days from now)"
+puts
+
+# Open in editor
+editor = ENV['EDITOR'] || 'vim'
+exec "#{editor} #{target_file}"

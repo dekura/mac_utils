@@ -1,0 +1,136 @@
+#!/usr/bin/env ruby
+# Tmuxinator project list sorted by ddl
+# Usage: tmuxinator-ls-ddl
+
+require 'yaml'
+require 'date'
+require 'fileutils'
+
+# Use safe YAML loading
+YAML::ENGINE.yamler = 'psych' if defined?(YAML::ENGINE)
+
+# Find tmuxinator config directory
+config_dir = File.expand_path('~/.config/tmuxinator')
+config_dir = File.expand_path('~/.tmuxinator') unless Dir.exist?(config_dir)
+
+unless Dir.exist?(config_dir)
+  puts "Error: Tmuxinator config directory not found"
+  exit 1
+end
+
+# Collect project info
+projects = []
+Dir.glob(File.join(config_dir, '*.yml')).each do |file|
+  begin
+    # Skip template file
+    next if File.basename(file) == 'template.yml'
+
+    config = YAML.safe_load(File.read(file), permitted_classes: [Date, Time, Symbol], aliases: true)
+    next unless config.is_a?(Hash)
+
+    project_name = config['name'] || File.basename(file, '.yml')
+    ddl_str = config['ddl']
+    description = config['description'] || ''
+    priority = config['priority'] || 'normal'
+
+    # Parse ddl
+    ddl = nil
+    if ddl_str
+      begin
+        ddl = Date.parse(ddl_str.to_s)
+      rescue ArgumentError
+        # Invalid date format, will be treated as no ddl
+      end
+    end
+
+    projects << {
+      name: project_name,
+      ddl: ddl,
+      ddl_str: ddl_str,
+      description: description,
+      priority: priority,
+      file: file
+    }
+  rescue => e
+    STDERR.puts "Warning: Failed to parse #{file}: #{e.message}"
+  end
+end
+
+# Sort projects: with ddl first (sorted by date), then without ddl (sorted by name)
+projects_with_ddl = projects.select { |p| p[:ddl] }.sort_by { |p| [p[:ddl], p[:name]] }
+projects_without_ddl = projects.reject { |p| p[:ddl] }.sort_by { |p| p[:name] }
+
+# Combine: projects with ddl first, then without ddl
+sorted_projects = projects_with_ddl + projects_without_ddl
+
+# Display
+if sorted_projects.empty?
+  puts "No tmuxinator projects found in #{config_dir}"
+  exit 0
+end
+
+# Calculate column widths
+name_width = sorted_projects.map { |p| p[:name].length }.max || 20
+ddl_width = 20
+
+# Print header
+puts
+
+today = Date.today
+
+# Helper function to pad colored strings
+def pad_status(colored_str, visible_text, width = 10)
+  visible_length = visible_text.length
+  padding = width - visible_length
+  padding = 0 if padding < 0
+  colored_str + (' ' * padding)
+end
+
+# Print projects
+sorted_projects.each do |project|
+  name = project[:name].ljust(name_width)
+
+  if project[:ddl]
+    days_left = (project[:ddl] - today).to_i
+
+    # Color coding based on urgency
+    if days_left < 0
+      status = pad_status("\e[31m⚠ OVERDUE\e[0m", "⚠ OVERDUE")
+      ddl_display = "#{project[:ddl_str]} (#{days_left.abs}d ago)"
+    elsif days_left == 0
+      status = pad_status("\e[33m● TODAY\e[0m", "● TODAY")
+      ddl_display = project[:ddl_str].to_s
+    elsif days_left <= 3
+      status = pad_status("\e[31m● URGENT\e[0m", "● URGENT")
+      ddl_display = "#{project[:ddl_str]} (#{days_left}d)"
+    elsif days_left <= 7
+      status = pad_status("\e[33m● SOON\e[0m", "● SOON")
+      ddl_display = "#{project[:ddl_str]} (#{days_left}d)"
+    else
+      status = pad_status("\e[32m○\e[0m", "○")
+      ddl_display = "#{project[:ddl_str]} (#{days_left}d)"
+    end
+
+    ddl_col = ddl_display.ljust(ddl_width)
+  else
+    status = pad_status("\e[90m-\e[0m", "-")
+    ddl_col = "No ddl".ljust(ddl_width)
+  end
+
+  # Priority indicator
+  priority_indicator = case project[:priority].to_s.downcase
+  when 'high', 'urgent' then "\e[31m▲\e[0m"
+  when 'low' then "\e[90m▼\e[0m"
+  else "\e[37m●\e[0m"
+  end
+
+  desc = project[:description].to_s.empty? ? "" : " - #{project[:description]}"
+
+  puts "#{status} #{priority_indicator} #{name}  #{ddl_col}#{desc}"
+end
+
+puts
+with_ddl = projects_with_ddl.length
+without_ddl = projects_without_ddl.length
+puts "Total: #{sorted_projects.length} projects (#{with_ddl} with ddl, #{without_ddl} without ddl)"
+puts
