@@ -29,8 +29,13 @@ The tmuxinator utilities form a cohesive system for managing project-based tmux 
 - `tmuxinator-archive` (Ruby) - Archives projects to `~/.config/tmuxinator-backups`
   - Moves inactive projects out of main config directory
   - Adds timestamps to prevent overwriting existing backups
+- `tmuxinator-summary` (Ruby) - Displays comprehensive progress summary for all projects
+  - Reads projects in same order as `tmuxinator-ls-ddl` (sorted by deadline/priority)
+  - For each project, looks for `prgs.md` in the project's root directory
+  - Displays project metadata (name, ddl, priority, description) alongside progress content
+  - Color-codes deadline urgency and highlights projects without progress reports
 
-**Design Philosophy**: These scripts extend tmuxinator rather than replace it. They read/write standard tmuxinator YAML configs with custom fields (`ddl`, `priority`) that tmuxinator ignores but the scripts use for organization.
+**Design Philosophy**: These scripts extend tmuxinator rather than replace it. They read/write standard tmuxinator YAML configs with custom fields (`ddl`, `priority`) that tmuxinator ignores but the scripts use for organization. Projects are expected to maintain a `prgs.md` file in their root directory for progress tracking.
 
 ### PDF Utilities
 
@@ -64,6 +69,9 @@ mux new <project_name>
 
 # Archive completed/inactive project
 mux archive <project_name>
+
+# Show progress summary for all projects (reads prgs.md from each project root)
+mux summary
 
 # Standard tmuxinator commands work through mux
 mux start <project_name>

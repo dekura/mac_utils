@@ -7,6 +7,8 @@ elif [[ "$1" == "new" ]]; then
   tmuxinator-new "${@:2}"
 elif [[ "$1" == "archive" ]]; then
   tmuxinator-archive "${@:2}"
+elif [[ "$1" == "summary" ]]; then
+  tmuxinator-summary "${@:2}"
 elif [[ "$1" == "" ]] || [[ "$1" == "-h" ]] || [[ "$1" == "--help" ]]; then
   echo "mux - tmuxinator wrapper with enhanced commands"
   echo ""
@@ -14,6 +16,7 @@ elif [[ "$1" == "" ]] || [[ "$1" == "-h" ]] || [[ "$1" == "--help" ]]; then
   echo "  mux ddl              - List projects sorted by deadline"
   echo "  mux new <name>       - Create new project from template (DDL: 7 days)"
   echo "  mux archive <name>   - Archive project to ~/.config/tmuxinator-backups"
+  echo "  mux summary          - Show progress summary for all projects"
   echo ""
   echo "Standard commands (run 'mux help' for full list):"
   tmuxinator help
