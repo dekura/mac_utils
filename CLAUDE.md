@@ -16,10 +16,18 @@ This is a personal `~/bin` directory containing utility scripts for workflow aut
 The tmuxinator utilities form a cohesive system for managing project-based tmux sessions with deadline tracking:
 
 - `mux` - Main entry point (zsh wrapper) that routes commands to specialized subcommands
-  - Routes `ddl`, `new`, and `archive` to custom commands
+  - Routes `ddl`, `new`, `archive`, and `summary` to custom commands
+  - By default, `mux ddl` launches the Textual dashboard; use `--linear` for classic view
   - Passes all other commands directly to tmuxinator
-- `tmuxinator-ls-ddl` (Ruby) - Lists projects sorted by deadline with color-coded urgency indicators
+- **`tmuxinator-ls-ddl.py` (Python + Textual)** - **NEW**: Interactive Eisenhower matrix dashboard
+  - Full-screen TUI application with 6-quadrant layout
+  - Classifies projects by urgency (≤7d deadline) and importance (priority field)
+  - Real-time refresh (`r` key), keyboard navigation, visual notifications
+  - CSS-styled quadrants: red (Q1: urgent+important), green (Q2: important), yellow (Q3: urgent), etc.
   - Reads YAML configs from `~/.config/tmuxinator`
+  - Shows project counts per quadrant and overdue warnings in header
+- `tmuxinator-ls-ddl` (Ruby) - **LEGACY**: Classic linear list view (use `--linear` flag)
+  - Lists projects sorted by deadline with color-coded urgency indicators
   - Parses `ddl`, `description`, and `priority` fields from project configs
   - Color codes: red (overdue/urgent), yellow (soon), green (normal), gray (no deadline)
 - `tmuxinator-new` (Ruby) - Creates new projects from template with auto-calculated 7-day deadline
@@ -30,7 +38,7 @@ The tmuxinator utilities form a cohesive system for managing project-based tmux 
   - Moves inactive projects out of main config directory
   - Adds timestamps to prevent overwriting existing backups
 - `tmuxinator-summary` (Ruby) - Displays comprehensive progress summary for all projects
-  - Reads projects in same order as `tmuxinator-ls-ddl` (sorted by deadline/priority)
+  - Reads projects in same order as deadline-sorted view
   - For each project, looks for `prgs.md` in the project's root directory
   - Displays project metadata (name, ddl, priority, description) alongside progress content
   - Color-codes deadline urgency and highlights projects without progress reports
@@ -61,8 +69,11 @@ The tmuxinator utilities form a cohesive system for managing project-based tmux 
 ### Tmuxinator Workflow
 
 ```bash
-# List projects sorted by deadline
+# Show interactive Eisenhower matrix dashboard (default, NEW!)
 mux ddl
+
+# Show classic linear list view (old behavior)
+mux ddl --linear
 
 # Create new project (opens in editor with 7-day deadline)
 mux new <project_name>
@@ -77,6 +88,12 @@ mux summary
 mux start <project_name>
 mux stop <project_name>
 ```
+
+**Interactive Dashboard Controls** (when using `mux ddl`):
+- `q` - Quit dashboard
+- `r` - Refresh (reload all projects)
+- `?` - Show help
+- `Tab` / `Shift+Tab` - Navigate between quadrants
 
 ### PDF Operations
 
@@ -97,7 +114,11 @@ pdfutils extractnotes input.pdf txt
 ## Dependencies
 
 ### Tmuxinator Scripts
-- Ruby (system default)
+- **Python 3.9+** (for Textual dashboard)
+  - `textual>=6.0` - TUI framework
+  - `pyyaml` - YAML parsing
+  - Install: `/opt/homebrew/Caskroom/miniconda/base/bin/pip install textual pyyaml`
+- Ruby (system default, for legacy scripts)
 - tmuxinator (expected to be installed and in PATH)
 - Standard Ruby libraries: yaml, date, fileutils
 

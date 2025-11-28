@@ -2,7 +2,14 @@
 # mux - tmuxinator wrapper with enhanced commands
 
 if [[ "$1" == "ddl" ]]; then
-  tmuxinator-ls-ddl "${@:2}"
+  # Check if --linear flag is present
+  if [[ "${@:2}" == *"--linear"* ]]; then
+    # Use old Ruby version
+    tmuxinator-ls-ddl $(echo "${@:2}" | sed 's/--linear//')
+  else
+    # Use new Textual Python version (default)
+    tmuxinator-ls-ddl.py "${@:2}"
+  fi
 elif [[ "$1" == "new" ]]; then
   tmuxinator-new "${@:2}"
 elif [[ "$1" == "archive" ]]; then
@@ -13,7 +20,8 @@ elif [[ "$1" == "" ]] || [[ "$1" == "-h" ]] || [[ "$1" == "--help" ]]; then
   echo "mux - tmuxinator wrapper with enhanced commands"
   echo ""
   echo "Enhanced commands:"
-  echo "  mux ddl              - List projects sorted by deadline"
+  echo "  mux ddl              - Show interactive Eisenhower matrix dashboard"
+  echo "  mux ddl --linear     - Show classic linear list view"
   echo "  mux new <name>       - Create new project from template (DDL: 7 days)"
   echo "  mux archive <name>   - Archive project to ~/.config/tmuxinator-backups"
   echo "  mux summary          - Show progress summary for all projects"
