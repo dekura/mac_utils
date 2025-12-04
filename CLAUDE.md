@@ -37,11 +37,21 @@ The tmuxinator utilities form a cohesive system for managing project-based tmux 
 - `tmuxinator-archive` (Ruby) - Archives projects to `~/.config/tmuxinator-backups`
   - Moves inactive projects out of main config directory
   - Adds timestamps to prevent overwriting existing backups
-- `tmuxinator-summary` (Ruby) - Displays comprehensive progress summary for all projects
-  - Reads projects in same order as deadline-sorted view
-  - For each project, looks for `prgs.md` in the project's root directory
-  - Displays project metadata (name, ddl, priority, description) alongside progress content
-  - Color-codes deadline urgency and highlights projects without progress reports
+- **`tmuxinator-summary` (Python + Textual)** - **NEW**: AI-powered project analysis with progress summary
+  - Full-screen TUI application with two sections: AI recommendations (top) and project details (bottom)
+  - **AI Analysis** (press 'a' key): Calls OpenAI API to analyze projects and provide:
+    - Prioritized work order (top 3-5 projects with reasoning)
+    - Strategic insights (risk warnings, stalled projects, workload balance)
+  - **Project Details**: Displays all projects sorted by deadline
+    - Shows project metadata (name, ddl, priority, description)
+    - Displays `prgs.md` content from each project's root directory
+    - Color-codes deadline urgency
+  - **OpenAI Configuration**:
+    - Base URL: `https://api.chatanywhere.org/v1`
+    - API Key: Read from `$chat_any_where_key` environment variable
+    - Model: `gpt-5.1`
+  - **Controls**: `a` (analyze with AI), `r` (refresh), `q` (quit), `?` (help)
+- `tmuxinator-summary.rb.bak` (Ruby) - **LEGACY**: Original text-based summary (backed up)
 
 **Design Philosophy**: These scripts extend tmuxinator rather than replace it. They read/write standard tmuxinator YAML configs with custom fields (`ddl`, `priority`) that tmuxinator ignores but the scripts use for organization. Projects are expected to maintain a `prgs.md` file in their root directory for progress tracking.
 
@@ -81,8 +91,10 @@ mux new <project_name>
 # Archive completed/inactive project
 mux archive <project_name>
 
-# Show progress summary for all projects (reads prgs.md from each project root)
+# Show AI-powered progress summary (reads prgs.md from each project root)
 mux summary
+
+# In the summary TUI, press 'a' to analyze projects with AI
 
 # Standard tmuxinator commands work through mux
 mux start <project_name>
@@ -114,10 +126,13 @@ pdfutils extractnotes input.pdf txt
 ## Dependencies
 
 ### Tmuxinator Scripts
-- **Python 3.9+** (for Textual dashboard)
+- **Python 3.9+** (for Textual TUI apps: dashboard and AI summary)
   - `textual>=6.0` - TUI framework
   - `pyyaml` - YAML parsing
-  - Install: `/opt/homebrew/Caskroom/miniconda/base/bin/pip install textual pyyaml`
+  - `openai` - OpenAI API client (for tmuxinator-summary)
+  - Install: `/opt/homebrew/Caskroom/miniconda/base/bin/pip install textual pyyaml openai`
+- **Environment Variables** (for AI features):
+  - `$chat_any_where_key` - API key for OpenAI-compatible endpoint
 - Ruby (system default, for legacy scripts)
 - tmuxinator (expected to be installed and in PATH)
 - Standard Ruby libraries: yaml, date, fileutils
