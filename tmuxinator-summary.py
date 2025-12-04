@@ -15,6 +15,7 @@ from textual.app import App, ComposeResult
 from textual.containers import Container, VerticalScroll
 from textual.widgets import Static, Header, Footer, LoadingIndicator
 from textual.binding import Binding
+from textual.worker import work, Worker
 from rich.text import Text
 from rich.markdown import Markdown
 
@@ -444,16 +445,28 @@ class SummaryApp(App):
         self.notify("Projects refreshed!", severity="information")
 
     def action_analyze(self) -> None:
-        """Analyze projects with AI"""
+        """Analyze projects with AI (triggers async worker)"""
         ai_panel = self.query_one("#ai-panel", AIRecommendationPanel)
 
         # Show analyzing state
         ai_panel.show_analyzing()
         self.notify("Analyzing projects with AI...", severity="information")
 
-        # Call AI analyzer
-        # Note: This blocks the UI. For production, use workers/async
+        # Start async worker
+        self.analyze_with_worker()
+
+    @work(exclusive=True, thread=True)
+    async def analyze_with_worker(self) -> None:
+        """Worker thread to call AI API without blocking UI"""
+        # This runs in a separate thread
         result = self.ai_analyzer.analyze_projects(self.projects)
+
+        # Call method to update UI from main thread
+        self.call_from_thread(self.on_analysis_complete, result)
+
+    def on_analysis_complete(self, result: dict) -> None:
+        """Handle AI analysis results (called from main thread)"""
+        ai_panel = self.query_one("#ai-panel", AIRecommendationPanel)
 
         if result["error"]:
             ai_panel.show_error(result["error"])
