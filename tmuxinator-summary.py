@@ -15,7 +15,7 @@ from textual.app import App, ComposeResult
 from textual.containers import Container, VerticalScroll
 from textual.widgets import Static, Header, Footer, LoadingIndicator
 from textual.binding import Binding
-from textual.worker import work, Worker
+from textual import work
 from rich.text import Text
 from rich.markdown import Markdown
 
