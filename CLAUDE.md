@@ -9,35 +9,52 @@ This is a personal `~/bin` directory containing utility scripts for workflow aut
 1. **Tmuxinator workflow management** - Enhanced tmuxinator commands for project lifecycle management with deadline tracking
 2. **PDF utilities** - Tools for PDF manipulation and annotation extraction
 
+## Directory Structure
+
+```
+~/bin/                        # Symlink to this repo, in PATH
+├── mux                       # Main entry point for tmuxinator commands
+├── pdfutils                  # Main entry point for PDF commands
+├── tmuxinator_scripts/       # Tmuxinator subcommand implementations
+│   ├── tmuxinator-ls-ddl.py  # Eisenhower matrix dashboard (Python/Textual)
+│   ├── tmuxinator-ls-ddl     # Legacy linear list view (Ruby)
+│   ├── tmuxinator-new        # Create new project (Ruby)
+│   ├── tmuxinator-archive    # Archive project (Ruby)
+│   ├── tmuxinator-summary.py # AI-powered summary (Python/Textual)
+│   └── tmuxinator-summary.rb.bak  # Legacy summary (backup)
+└── pdfutils_scripts/         # PDF subcommand implementations
+    └── extract_annotations.py
+```
+
 ## Architecture
 
 ### Tmuxinator Utilities
 
-The tmuxinator utilities form a cohesive system for managing project-based tmux sessions with deadline tracking:
+The tmuxinator utilities form a cohesive system for managing project-based tmux sessions with deadline tracking. All subcommands are located in `tmuxinator_scripts/` and accessed via the `mux` wrapper.
 
 - `mux` - Main entry point (zsh wrapper) that routes commands to specialized subcommands
-  - Routes `ddl`, `new`, `archive`, and `summary` to custom commands
+  - Routes `ddl`, `new`, `archive`, and `summary` to scripts in `tmuxinator_scripts/`
   - By default, `mux ddl` launches the Textual dashboard; use `--linear` for classic view
   - Passes all other commands directly to tmuxinator
-- **`tmuxinator-ls-ddl.py` (Python + Textual)** - **NEW**: Interactive Eisenhower matrix dashboard
+- **`tmuxinator_scripts/tmuxinator-ls-ddl.py` (Python + Textual)** - Interactive Eisenhower matrix dashboard
   - Full-screen TUI application with 6-quadrant layout
   - Classifies projects by urgency (≤7d deadline) and importance (priority field)
   - Real-time refresh (`r` key), keyboard navigation, visual notifications
   - CSS-styled quadrants: red (Q1: urgent+important), green (Q2: important), yellow (Q3: urgent), etc.
   - Reads YAML configs from `~/.config/tmuxinator`
   - Shows project counts per quadrant and overdue warnings in header
-- `tmuxinator-ls-ddl` (Ruby) - **LEGACY**: Classic linear list view (use `--linear` flag)
+- `tmuxinator_scripts/tmuxinator-ls-ddl` (Ruby) - **LEGACY**: Classic linear list view (use `--linear` flag)
   - Lists projects sorted by deadline with color-coded urgency indicators
   - Parses `ddl`, `description`, and `priority` fields from project configs
   - Color codes: red (overdue/urgent), yellow (soon), green (normal), gray (no deadline)
-- `tmuxinator-new` (Ruby) - Creates new projects from template with auto-calculated 7-day deadline
+- `tmuxinator_scripts/tmuxinator-new` (Ruby) - Creates new projects from template with auto-calculated 7-day deadline
   - Uses `~/.config/tmuxinator/template.yml` as base
   - Automatically sets ddl to 7 days from creation
   - Opens new config in $EDITOR after creation
-- `tmuxinator-archive` (Ruby) - Archives projects to `~/.config/tmuxinator-backups`
+- `tmuxinator_scripts/tmuxinator-archive` (Ruby) - Archives projects to `~/.config/tmuxinator-backups`
   - Moves inactive projects out of main config directory
   - Adds timestamps to prevent overwriting existing backups
-- **`tmuxinator-summary` (Python + Textual)** - **NEW**: AI-powered project analysis with progress summary
+- **`tmuxinator_scripts/tmuxinator-summary.py` (Python + Textual)** - AI-powered project analysis with progress summary
   - Full-screen TUI application with two sections: AI recommendations (top) and project details (bottom)
   - **AI Analysis** (press 'a' key): Calls OpenAI API to analyze projects and provide:
     - Prioritized work order (top 3-5 projects with reasoning)
@@ -51,7 +68,7 @@ The tmuxinator utilities form a cohesive system for managing project-based tmux 
     - API Key: Read from `$chat_any_where_key` environment variable
     - Model: `gpt-5.1`
   - **Controls**: `a` (analyze with AI), `r` (refresh), `q` (quit), `?` (help)
-- `tmuxinator-summary.rb.bak` (Ruby) - **LEGACY**: Original text-based summary (backed up)
+- `tmuxinator_scripts/tmuxinator-summary.rb.bak` (Ruby) - **LEGACY**: Original text-based summary (backed up)
 
 **Design Philosophy**: These scripts extend tmuxinator rather than replace it. They read/write standard tmuxinator YAML configs with custom fields (`ddl`, `priority`) that tmuxinator ignores but the scripts use for organization. Projects are expected to maintain a `prgs.md` file in their root directory for progress tracking.
 
