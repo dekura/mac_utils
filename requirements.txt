@@ -1,0 +1,12 @@
+# Requirements for ~/bin Python utilities
+# Install with: /opt/homebrew/Caskroom/miniconda/base/bin/pip install -r requirements.txt
+
+# PDF utilities (pdfutils_scripts/extract_annotations.py)
+pymupdf>=1.23.0
+
+# Tmuxinator TUI applications (tmuxinator-ls-ddl.py, tmuxinator-summary.py)
+textual>=0.41.0
+pyyaml>=6.0
+
+# AI-powered analysis (tmuxinator-summary.py)
+openai>=1.0.0

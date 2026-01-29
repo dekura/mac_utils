@@ -6,6 +6,7 @@ Full-screen TUI application using Textual framework with OpenAI integration
 
 import os
 import sys
+import json
 from datetime import date, datetime
 from pathlib import Path
 from typing import List, Optional
@@ -170,10 +171,54 @@ class AIAnalyzer:
     def __init__(self):
         self.base_url = "https://api.chatanywhere.org/v1"
         self.api_key = os.environ.get("chat_any_where_key")
-        self.model = "gpt-5.1"
+        # Use gpt-4o to avoid reasoning tokens (gpt-5.1 uses reasoning by default)
+        self.model = "gpt-4o"
 
-    def analyze_projects(self, projects: List[ProjectWithProgress]) -> dict:
+        # Cache directory
+        self.cache_dir = Path.home() / ".cache" / "tmuxinator-summary"
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
+        self.cache_file = self.cache_dir / "ai_analysis.json"
+
+    def load_cached_analysis(self) -> Optional[dict]:
+        """Load cached AI analysis if exists"""
+        if not self.cache_file.exists():
+            return None
+
+        try:
+            with open(self.cache_file, 'r', encoding='utf-8') as f:
+                cache_data = json.load(f)
+                # Check if cache is from today
+                cache_date = cache_data.get('date')
+                if cache_date == date.today().isoformat():
+                    return {
+                        "error": None,
+                        "content": cache_data.get('content', '')
+                    }
+        except Exception:
+            pass
+
+        return None
+
+    def save_analysis_to_cache(self, content: str):
+        """Save AI analysis to cache"""
+        try:
+            cache_data = {
+                'date': date.today().isoformat(),
+                'content': content
+            }
+            with open(self.cache_file, 'w', encoding='utf-8') as f:
+                json.dump(cache_data, f, ensure_ascii=False, indent=2)
+        except Exception:
+            pass  # Silently fail if cache write fails
+
+    def analyze_projects(self, projects: List[ProjectWithProgress], force: bool = False) -> dict:
         """Call OpenAI API to analyze projects and return recommendations"""
+        # Try to load from cache if not forcing refresh
+        if not force:
+            cached = self.load_cached_analysis()
+            if cached:
+                return cached
+
         if not self.api_key:
             return {
                 "error": "API key not found. Set $chat_any_where_key environment variable.",
@@ -196,7 +241,7 @@ class AIAnalyzer:
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are a productivity advisor analyzing project portfolios. Provide concise, actionable advice."
+                        "content": "你是一个生产力顾问，专门分析项目组合。请提供简洁、可操作的建议。用中文回复。"
                     },
                     {
                         "role": "user",
@@ -204,10 +249,22 @@ class AIAnalyzer:
                     }
                 ],
                 temperature=0.7,
-                max_tokens=1000
+                max_tokens=1500  # Increased for more comprehensive analysis
             )
 
             content = response.choices[0].message.content
+
+            # Debug logging to file
+            with open("/tmp/ai-debug.log", "a") as f:
+                f.write(f"\n=== API Response ===\n")
+                f.write(f"Response message: {response.choices[0].message}\n")
+                f.write(f"Content type: {type(content)}\n")
+                f.write(f"Content: {content}\n")
+
+            # Save to cache
+            if content:
+                self.save_analysis_to_cache(content)
+
             return {
                 "error": None,
                 "content": content
@@ -244,27 +301,27 @@ Recent Progress:
 ---
 """)
 
-        prompt = f"""You are a productivity advisor analyzing my project portfolio.
+        prompt = f"""你是一个生产力顾问，正在分析我的项目组合。
 
-Today is {today.strftime('%Y-%m-%d')}.
+今天是 {today.strftime('%Y年%m月%d日')}。
 
-Here are my active projects:
+以下是我的活跃项目：
 
 {''.join(project_summaries)}
 
-Please analyze and provide:
+请分析并提供：
 
-1. **PRIORITY ORDER** (top 3-5 projects I should focus on):
-   - Rank projects by what I should work on first
-   - For each, explain WHY (consider: deadline urgency, current progress, priority level, momentum)
+1. **优先级排序**（我应该专注的前3-5个项目）：
+   - 按照我应该优先处理的顺序排列项目
+   - 对每个项目解释为什么（考虑：截止日期紧迫性、当前进度、优先级级别、动力）
 
-2. **STRATEGIC INSIGHTS**:
-   - Which projects are at risk of missing deadlines?
-   - Which projects seem stalled despite importance?
-   - Any workload balance issues (too scattered vs too focused)?
-   - Recommendations for time allocation this week
+2. **战略洞察**：
+   - 哪些项目有错过截止日期的风险？
+   - 哪些重要项目似乎停滞不前？
+   - 工作负载平衡是否存在问题（过于分散 vs 过于集中）？
+   - 本周时间分配建议
 
-Format your response as markdown with ## headers.
+请用中文回复，使用 markdown 格式，用 ## 标题。
 """
         return prompt
 
@@ -278,23 +335,40 @@ class AIRecommendationPanel(Static):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.border_title = "🤖 AI RECOMMENDATIONS"
 
     def show_empty(self):
         """Show initial empty state"""
-        self.update("[dim italic]Press 'a' to analyze projects with AI[/dim italic]")
+        self.update("[dim italic]按 'a' 键使用 AI 分析项目[/dim italic]")
 
     def show_analyzing(self):
         """Show analyzing state"""
-        self.update("🔄 [yellow]Analyzing projects...[/yellow]\n\nThis may take a few seconds.")
+        self.update("🔄 [yellow]正在分析项目...[/yellow]\n\n这可能需要几秒钟。")
 
     def show_results(self, content: str):
         """Show AI analysis results"""
-        self.update(Markdown(content))
+        # Debug logging to file
+        with open("/tmp/ai-debug.log", "a") as f:
+            f.write(f"\n=== show_results ===\n")
+            f.write(f"Content length: {len(content)}\n")
+            f.write(f"Content: {content[:500]}\n")
+
+        if not content:
+            self.update("[red]Empty content received[/red]")
+        else:
+            # Try rendering as markdown
+            try:
+                self.update(Markdown(content))
+                with open("/tmp/ai-debug.log", "a") as f:
+                    f.write("Markdown render succeeded\n")
+            except Exception as e:
+                with open("/tmp/ai-debug.log", "a") as f:
+                    f.write(f"Markdown render failed: {e}\n")
+                # Fallback to plain text
+                self.update(content)
 
     def show_error(self, error: str):
         """Show error message"""
-        self.update(f"[red bold]Error:[/red bold] {error}\n\n[dim]Press 'a' to retry[/dim]")
+        self.update(f"[red bold]错误：[/red bold] {error}\n\n[dim]按 'a' 键重试[/dim]")
 
 
 class ProjectListPanel(Static):
@@ -303,12 +377,11 @@ class ProjectListPanel(Static):
     def __init__(self, projects: List[ProjectWithProgress], *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.projects = projects
-        self.border_title = f"📋 PROJECT DETAILS ({len(projects)} projects)"
 
     def compose(self) -> ComposeResult:
         """Create the widget content"""
         if not self.projects:
-            yield Static("[dim italic]No projects found[/dim italic]")
+            yield Static("[dim italic]未找到项目[/dim italic]")
             return
 
         content_parts = []
@@ -327,33 +400,32 @@ class ProjectListPanel(Static):
 
             # Deadline
             ddl_text = project.display_deadline
-            content_parts.append(f"DDL: [{project.deadline_color}]{ddl_text}[/{project.deadline_color}]\n")
+            content_parts.append(f"截止日期: [{project.deadline_color}]{ddl_text}[/{project.deadline_color}]\n")
 
             # Description
             if project.description:
-                content_parts.append(f"Description: {project.description}\n")
+                content_parts.append(f"描述: {project.description}\n")
 
             # Root path
             if project.root:
-                content_parts.append(f"Path: [dim]{project.root}[/dim]\n")
+                content_parts.append(f"路径: [dim]{project.root}[/dim]\n")
 
             content_parts.append("\n")
 
             # Progress
             if project.progress_content:
-                content_parts.append("[bold]Progress:[/bold]\n")
+                content_parts.append("[bold]进度:[/bold]\n")
                 # Indent progress content
                 for line in project.progress_content.split('\n'):
                     content_parts.append(f"  {line}\n")
             else:
-                content_parts.append("[dim][No prgs.md found][/dim]\n")
+                content_parts.append("[dim][未找到 prgs.md][/dim]\n")
 
         yield Static("".join(content_parts))
 
     def refresh_projects(self, projects: List[ProjectWithProgress]):
         """Update with new project list"""
         self.projects = projects
-        self.border_title = f"📋 PROJECT DETAILS ({len(projects)} projects)"
         # Remove all children and recreate
         self.remove_children()
         self.mount(*self.compose())
@@ -371,19 +443,23 @@ class SummaryApp(App):
         background: $surface;
     }
 
-    #ai-panel {
+    #ai-scroll {
         height: 40%;
         border: heavy green;
-        padding: 1;
-        overflow-y: auto;
         background: $success 5%;
     }
 
-    #project-panel {
+    #ai-panel {
+        padding: 1;
+    }
+
+    #project-scroll {
         height: 60%;
         border: round $primary;
+    }
+
+    #project-panel {
         padding: 1;
-        overflow-y: auto;
     }
 
     Footer {
@@ -392,16 +468,16 @@ class SummaryApp(App):
     """
 
     BINDINGS = [
-        Binding("q", "quit", "Quit", show=True),
-        Binding("r", "refresh", "Refresh", show=True),
-        Binding("a", "analyze", "Analyze with AI", show=True),
-        Binding("?", "help", "Help", show=True),
+        Binding("q", "quit", "退出", show=True),
+        Binding("r", "refresh", "刷新", show=True),
+        Binding("a", "analyze", "AI分析", show=True),
+        Binding("?", "help", "帮助", show=True),
     ]
 
     def __init__(self):
         super().__init__()
-        self.title = "Tmuxinator Summary - AI-Powered Analysis"
-        self.sub_title = f"{date.today().strftime('%Y-%m-%d')}"
+        self.title = "Tmuxinator 项目总结 - AI 分析"
+        self.sub_title = f"{date.today().strftime('%Y年%m月%d日')}"
 
         # Find config directory
         self.config_dir = Path.home() / ".config" / "tmuxinator"
@@ -417,17 +493,30 @@ class SummaryApp(App):
         # Track if we've analyzed
         self.has_analyzed = False
 
+    def on_mount(self) -> None:
+        """Called when app is mounted - load cached analysis"""
+        # Try to load cached analysis
+        cached = self.ai_analyzer.load_cached_analysis()
+        if cached and cached.get("content"):
+            ai_panel = self.query_one("#ai-panel", AIRecommendationPanel)
+            ai_panel.show_results(cached["content"])
+            self.has_analyzed = True
+
     def compose(self) -> ComposeResult:
         """Create the application layout"""
         yield Header()
 
-        # AI recommendations panel
-        ai_panel = AIRecommendationPanel(id="ai-panel")
-        ai_panel.show_empty()
-        yield ai_panel
+        # AI recommendations panel (scrollable)
+        with VerticalScroll(id="ai-scroll") as ai_scroll:
+            ai_scroll.border_title = "🤖 AI 分析建议"
+            ai_panel = AIRecommendationPanel(id="ai-panel")
+            ai_panel.show_empty()
+            yield ai_panel
 
-        # Project list panel
-        yield ProjectListPanel(self.projects, id="project-panel")
+        # Project list panel (scrollable)
+        with VerticalScroll(id="project-scroll") as project_scroll:
+            project_scroll.border_title = f"📋 项目详情 ({len(self.projects)} 个项目)"
+            yield ProjectListPanel(self.projects, id="project-panel")
 
         yield Footer()
 
@@ -439,52 +528,69 @@ class SummaryApp(App):
         project_panel = self.query_one("#project-panel", ProjectListPanel)
         project_panel.refresh_projects(self.projects)
 
-        # Update subtitle
-        self.sub_title = f"{date.today().strftime('%Y-%m-%d')} | {len(self.projects)} projects"
+        # Update project scroll container border title
+        project_scroll = self.query_one("#project-scroll", VerticalScroll)
+        project_scroll.border_title = f"📋 项目详情 ({len(self.projects)} 个项目)"
 
-        self.notify("Projects refreshed!", severity="information")
+        # Update subtitle
+        self.sub_title = f"{date.today().strftime('%Y-%m-%d')} | {len(self.projects)} 个项目"
+
+        self.notify("项目列表已刷新！", severity="information")
 
     def action_analyze(self) -> None:
-        """Analyze projects with AI (triggers async worker)"""
+        """Analyze projects with AI"""
         ai_panel = self.query_one("#ai-panel", AIRecommendationPanel)
 
         # Show analyzing state
         ai_panel.show_analyzing()
-        self.notify("Analyzing projects with AI...", severity="information")
+        self.notify("正在使用 AI 分析项目...", severity="information")
 
-        # Start async worker
-        self.analyze_with_worker()
+        # Run analysis in background worker to avoid blocking UI
+        self.run_worker_analyze()
 
     @work(exclusive=True, thread=True)
-    async def analyze_with_worker(self) -> None:
-        """Worker thread to call AI API without blocking UI"""
-        # This runs in a separate thread
-        result = self.ai_analyzer.analyze_projects(self.projects)
+    def run_worker_analyze(self) -> None:
+        """Background worker for AI analysis"""
+        # Call AI analyzer in worker thread with force=True to bypass cache
+        result = self.ai_analyzer.analyze_projects(self.projects, force=True)
 
-        # Call method to update UI from main thread
+        # Update UI with results (safe to call from worker)
         self.call_from_thread(self.on_analysis_complete, result)
 
     def on_analysis_complete(self, result: dict) -> None:
         """Handle AI analysis results (called from main thread)"""
         ai_panel = self.query_one("#ai-panel", AIRecommendationPanel)
 
+        # Debug logging to file
+        with open("/tmp/ai-debug.log", "a") as f:
+            f.write(f"\n=== on_analysis_complete ===\n")
+            f.write(f"Result keys: {result.keys()}\n")
+            f.write(f"Error: {result.get('error')}\n")
+            f.write(f"Content length: {len(result.get('content', ''))}\n")
+            f.write(f"Content preview: {result.get('content', '')[:500]}\n")
+
         if result["error"]:
             ai_panel.show_error(result["error"])
-            self.notify(f"Analysis failed: {result['error']}", severity="error")
+            self.notify(f"分析失败：{result['error']}", severity="error")
         else:
-            ai_panel.show_results(result["content"])
-            self.notify("Analysis complete!", severity="success")
-            self.has_analyzed = True
+            content = result["content"]
+            if not content or content.strip() == "":
+                ai_panel.show_error("AI 返回了空响应")
+                self.notify("AI 返回了空响应", severity="warning")
+            else:
+                ai_panel.show_results(content)
+                self.notify("分析完成！", severity="success")
+                self.has_analyzed = True
 
     def action_help(self) -> None:
         """Show help message"""
         help_text = """
-Commands:
-  a - Analyze projects with AI
-  r - Refresh project list from disk
-  q - Quit application
-  ↑↓ - Scroll panels
-  ? - Show this help
+快捷键：
+  a - 使用 AI 分析项目
+  r - 从磁盘刷新项目列表
+  q - 退出应用
+  ↑↓ - 滚动面板
+  ? - 显示此帮助
 """
         self.notify(help_text, severity="information", timeout=10)
 
