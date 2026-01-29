@@ -1,6 +1,0 @@
-#!/bin/bash
-# Tmuxinator Summary - AI-Powered Analysis
-# Wrapper script to launch Python TUI application
-
-exec /opt/homebrew/Caskroom/miniconda/base/bin/python \
-    ~/bin/tmuxinator-summary.py "$@"

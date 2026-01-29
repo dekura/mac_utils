@@ -1,21 +1,24 @@
 #!/bin/zsh
 # mux - tmuxinator wrapper with enhanced commands
 
+SCRIPT_DIR="${0:A:h}/tmuxinator_scripts"
+PYTHON="/opt/homebrew/Caskroom/miniconda/base/bin/python"
+
 if [[ "$1" == "ddl" ]]; then
   # Check if --linear flag is present
   if [[ "${@:2}" == *"--linear"* ]]; then
     # Use old Ruby version
-    tmuxinator-ls-ddl $(echo "${@:2}" | sed 's/--linear//')
+    "$SCRIPT_DIR/tmuxinator-ls-ddl" $(echo "${@:2}" | sed 's/--linear//')
   else
     # Use new Textual Python version (default)
-    tmuxinator-ls-ddl.py "${@:2}"
+    "$PYTHON" "$SCRIPT_DIR/tmuxinator-ls-ddl.py" "${@:2}"
   fi
 elif [[ "$1" == "new" ]]; then
-  tmuxinator-new "${@:2}"
+  "$SCRIPT_DIR/tmuxinator-new" "${@:2}"
 elif [[ "$1" == "archive" ]]; then
-  tmuxinator-archive "${@:2}"
+  "$SCRIPT_DIR/tmuxinator-archive" "${@:2}"
 elif [[ "$1" == "summary" ]]; then
-  tmuxinator-summary "${@:2}"
+  "$PYTHON" "$SCRIPT_DIR/tmuxinator-summary.py" "${@:2}"
 elif [[ "$1" == "" ]] || [[ "$1" == "-h" ]] || [[ "$1" == "--help" ]]; then
   echo "mux - tmuxinator wrapper with enhanced commands"
   echo ""
